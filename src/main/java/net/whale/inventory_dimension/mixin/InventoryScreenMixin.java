@@ -3,12 +3,14 @@ package net.whale.inventory_dimension.mixin;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraftforge.network.PacketDistributor;
 import net.whale.inventory_dimension.acess.PlayerInterface;
-import net.whale.inventory_dimension.network.MyPacket;
-import net.whale.inventory_dimension.network.NetworkHandler;
+import net.whale.inventory_dimension.entity.ModEntities;
+import net.whale.inventory_dimension.entity.entities.MindEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -16,6 +18,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Mixin(InventoryScreen.class)
 public abstract class InventoryScreenMixin {
@@ -52,7 +57,18 @@ public abstract class InventoryScreenMixin {
                 if(slot != null){
                     System.out.println("slot:"+slot.toString()+"item:"+slot.getItem().toString());
                     if(slot.getItem().getItem() == Blocks.ENDER_CHEST.asItem()){
-                        NetworkHandler.INSTANCE.send(new MyPacket(((InventoryScreen)(Object) this).getMinecraft().player.getUUID()), PacketDistributor.SERVER.noArg());
+                        ClientLevel level = Minecraft.getInstance().level;
+                        MindEntity mind = new MindEntity(ModEntities.MIND_ENTITY.get(),level);
+                        LocalPlayer player = Minecraft.getInstance().player;
+                        mind.setPlayerUUID(player.getUUID());
+                        ((PlayerInterface) player).setInventory_Dimension$controlledEntity(mind);
+                        mind.setPos(player.position());
+                        level.addEntity(mind);
+                        Minecraft.getInstance().setCameraEntity(mind);
+                        List<ItemStack> hotbar = new ArrayList<>();
+                        for (int i = 0; i < 27; i++) {
+                            hotbar.add(player.getEnderChestInventory().getItem(i));
+                        }
                     } else{
 
                     }

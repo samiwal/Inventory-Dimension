@@ -16,10 +16,14 @@ import javax.annotation.Nullable;
 @Mixin(LocalPlayer.class)
 public abstract class ClientPlayerMixin implements PlayerInterface {
     @Unique
-    private @Nullable MindEntity inventory_Dimension$controlledEntity;
+    private @Nullable MindEntity inventory_Dimension$controlledEntity = null;
     @Unique
     public @Nullable MindEntity getInventory_Dimension$ControlledEntity(){
         return inventory_Dimension$controlledEntity;
+    }
+    @Override
+    public boolean hasInventory_Dimension$controlledEntity() {
+        return inventory_Dimension$controlledEntity != null;
     }
     @Unique
     public void setInventory_Dimension$controlledEntity(@Nullable MindEntity entity){
@@ -28,8 +32,7 @@ public abstract class ClientPlayerMixin implements PlayerInterface {
     @Inject(method = "move",at = @At("HEAD"),cancellable = true)
     private void onMove(MoverType moverType, Vec3 travelVec, CallbackInfo ci){
         if(inventory_Dimension$controlledEntity != null){
-            System.out.println("nonnull");
-            inventory_Dimension$controlledEntity.move(moverType,travelVec);
+            ci.cancel();
         }
     }
 }
