@@ -2,6 +2,7 @@ package net.whale.inventory_dimension.mixin;
 
 import net.minecraft.client.Minecraft;
 import net.whale.inventory_dimension.acess.PlayerInterface;
+import net.whale.inventory_dimension.acess.RenderInterface;
 import net.whale.inventory_dimension.entity.entities.MindEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,21 +16,31 @@ public abstract class MinecraftMixin {
     private void onHandleKeybinds(CallbackInfo ci) {
         Minecraft mc = (Minecraft) (Object) this;
         if(((PlayerInterface) mc.player).hasInventory_Dimension$controlledEntity()) {
-            if (mc.options.keyAttack.consumeClick()) {
-                MindEntity entity = ((PlayerInterface) mc.player).getInventory_Dimension$controlledEntity();
+            MindEntity entity = ((PlayerInterface) mc.player).getInventory_Dimension$controlledEntity();
+            if (mc.options.keyAttack.consumeClick() || mc.options.keyAttack.isDown()) {
                 entity.deleteBlockIfPossible();
                 ci.cancel();
             }
-            if (mc.options.keyUse.consumeClick()) {
-                MindEntity entity = ((PlayerInterface) mc.player).getInventory_Dimension$controlledEntity();
+            if (mc.options.keyUse.consumeClick()|| mc.options.keyUse.isDown()) {
                 entity.placeBlockIfPossible();
                 ci.cancel();
             }
-            if (mc.options.keyPickItem.consumeClick()) {
-                MindEntity entity = ((PlayerInterface) mc.player).getInventory_Dimension$controlledEntity();
+            if (mc.options.keyPickItem.consumeClick() || mc.options.keyPickItem.isDown()) {
                 entity.selectBlockIfPossible();
                 ci.cancel();
             }
+            if (mc.options.keySwapOffhand.consumeClick()) {
+                (((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer)).Inventory_Dimension$setSwap();
+                ci.cancel();
+            }if(mc.options.keySwapOffhand.isDown()) ci.cancel();
+            if (mc.options.keyDrop.consumeClick()) {
+                ((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer).Inventory_Dimension$setDrop();
+                ci.cancel();
+            }if(mc.options.keyDrop.isDown()) ci.cancel();
+            if (mc.options.keySprint.consumeClick()) {
+                ((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer).Inventory_Dimension$setSprint();
+                ci.cancel();
+            }if(mc.options.keySprint.isDown()) ci.cancel();
         }
     }
 }

@@ -19,9 +19,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Mixin(InventoryScreen.class)
 public abstract class InventoryScreenMixin {
     @Shadow private float xMouse;
@@ -65,10 +62,6 @@ public abstract class InventoryScreenMixin {
                         mind.setPos(player.position());
                         level.addEntity(mind);
                         Minecraft.getInstance().setCameraEntity(mind);
-                        List<ItemStack> hotbar = new ArrayList<>();
-                        for (int i = 0; i < 27; i++) {
-                            hotbar.add(player.getEnderChestInventory().getItem(i));
-                        }
                     } else{
 
                     }

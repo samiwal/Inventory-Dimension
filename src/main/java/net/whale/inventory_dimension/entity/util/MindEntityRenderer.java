@@ -27,20 +27,18 @@ public class MindEntityRenderer extends HumanoidMobRenderer<MindEntity, PlayerMo
     private final ConcurrentMap<UUID, ResourceLocation> skinCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Boolean> slimCache = new ConcurrentHashMap<>();
     public MindEntityRenderer(EntityRendererProvider.Context ctx) {
-        super(ctx, new PlayerModel<>(ctx.bakeLayer(ModelLayers.PLAYER), true), 0.5F);
+        super(ctx, new PlayerModel<>(ctx.bakeLayer(ModelLayers.PLAYER), false), 0.5F);
         this.steveModel = new PlayerModel<>(ctx.bakeLayer(ModelLayers.PLAYER), false);
         this.alexModel = new PlayerModel<>(ctx.bakeLayer(ModelLayers.PLAYER_SLIM), true);
     }
     @Override
     public void render(MindEntity entity, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource bufferSource, int packedLight) {
-
         UUID uuid = entity.getPlayerUUID();
         if (uuid != null) {
             boolean slim = slimCache.getOrDefault(uuid, false);
             this.model = slim ? alexModel : steveModel;
         }
-
         super.render(entity, entityYaw, partialTicks, poseStack, bufferSource, packedLight);
     }
     @Override
