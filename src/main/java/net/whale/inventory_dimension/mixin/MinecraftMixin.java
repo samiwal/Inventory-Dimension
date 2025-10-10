@@ -30,17 +30,15 @@ public abstract class MinecraftMixin {
                 ci.cancel();
             }
             if (mc.options.keySwapOffhand.consumeClick()) {
-                (((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer)).Inventory_Dimension$setSwap();
+                (((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer)).setInventory_Dimension$Swap();
                 ci.cancel();
             }if(mc.options.keySwapOffhand.isDown()) ci.cancel();
             if (mc.options.keyDrop.consumeClick()) {
-                ((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer).Inventory_Dimension$setDrop();
+                ((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer).setInventory_Dimension$Drop();
                 ci.cancel();
             }if(mc.options.keyDrop.isDown()) ci.cancel();
-            if (mc.options.keySprint.consumeClick()) {
-                ((RenderInterface) Minecraft.getInstance().gameRenderer.itemInHandRenderer).Inventory_Dimension$setSprint();
-                ci.cancel();
-            }if(mc.options.keySprint.isDown()) ci.cancel();
+            if (mc.options.keySprint.consumeClick()) ci.cancel();
+            if(mc.options.keySprint.isDown()) ci.cancel();
         }
     }
 }

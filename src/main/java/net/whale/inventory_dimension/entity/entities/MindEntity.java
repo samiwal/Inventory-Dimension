@@ -106,5 +106,6 @@ public class MindEntity extends Mob {
         if(!up) echestitemnumber = (echestitemnumber + 1) % (((PlayerInterface) mc.player).getInventory_Dimension$entityItems()+1);
         else echestitemnumber = (echestitemnumber - 1 + (((PlayerInterface) mc.player).getInventory_Dimension$entityItems()+1)) % (((PlayerInterface) mc.player).getInventory_Dimension$entityItems()+1);
         this.echestitem = mc.player.getEnderChestInventory().getItem(echestitemnumber).getItem();
+        mc.player.playSound(net.minecraft.sounds.SoundEvents.UI_STONECUTTER_SELECT_RECIPE, 0.5F, 1.0F);
     }
 }

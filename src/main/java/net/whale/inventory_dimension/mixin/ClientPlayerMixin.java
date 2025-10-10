@@ -6,7 +6,6 @@ import net.minecraft.world.phys.Vec3;
 import net.whale.inventory_dimension.acess.PlayerInterface;
 import net.whale.inventory_dimension.entity.entities.MindEntity;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,35 +15,31 @@ import javax.annotation.Nullable;
 
 @Mixin(LocalPlayer.class)
 public abstract class ClientPlayerMixin implements PlayerInterface {
-    @Shadow protected int sprintTriggerTime;
-    @Unique
-    private @Nullable MindEntity inventory_Dimension$controlledEntity = null;
-    @Unique
-    private int inventory_Dimension$entityItems;
-    @Unique
-    public @Nullable MindEntity getInventory_Dimension$controlledEntity(){
-        return inventory_Dimension$controlledEntity;
-    }
-    @Override
-    public boolean hasInventory_Dimension$controlledEntity() {
-        return inventory_Dimension$controlledEntity != null;
-    }
-    @Unique
-    public void setInventory_Dimension$controlledEntity(@Nullable MindEntity entity){
-        this.inventory_Dimension$controlledEntity = entity;
-    }
+    @Unique private @Nullable MindEntity inventory_Dimension$controlledEntity = null;
+    @Unique private int inventory_Dimension$entityItems;
+    @Unique private boolean inventory_Dimension$isOnItemSlot;
+    @Unique private int inventory_Dimension$itemSlotNumber;
+    @Unique private boolean inventory_Dimension$isDraggingPlayerModel;
+
+    @Unique public @Nullable MindEntity getInventory_Dimension$controlledEntity(){return inventory_Dimension$controlledEntity;}
+    @Override public boolean hasInventory_Dimension$controlledEntity() {return inventory_Dimension$controlledEntity != null;}
+    @Unique public void setInventory_Dimension$controlledEntity(@Nullable MindEntity entity){this.inventory_Dimension$controlledEntity = entity;}
+
     @Inject(method = "move",at = @At("HEAD"),cancellable = true)
     private void onMove(MoverType moverType, Vec3 travelVec, CallbackInfo ci){
         if(hasInventory_Dimension$controlledEntity()){
             ci.cancel();
         }
     }
-    @Override
-    public void setInventoryDimension$entityItems(int items) {
-        inventory_Dimension$entityItems = items;
-    }
-    @Override
-    public int getInventory_Dimension$entityItems() {
-        return inventory_Dimension$entityItems;
-    }
+    @Override public void setInventoryDimension$entityItems(int items) {inventory_Dimension$entityItems = items;}
+    @Override public int getInventory_Dimension$entityItems() {return inventory_Dimension$entityItems;}
+
+    @Override public boolean getInventoryDimension$isOnItemSlot() {return inventory_Dimension$isOnItemSlot;}
+    @Override public void setInventoryDimension$isOnItemSlot(boolean isOnItemSlot) {inventory_Dimension$isOnItemSlot = isOnItemSlot;}
+
+    @Override public int getInventory_Dimension$itemSlotNumber() {return inventory_Dimension$itemSlotNumber;}
+    @Override public void setInventory_Dimension$itemSlotNumber(int inventory_Dimension$itemSlotNumber) {this.inventory_Dimension$itemSlotNumber = inventory_Dimension$itemSlotNumber;}
+
+    @Override public void setInventoryDimension$isDraggingPlayerModel(boolean dragging) {inventory_Dimension$isDraggingPlayerModel = dragging;}
+    @Override public boolean getInventoryDimension$isDraggingPlayerModel() {return inventory_Dimension$isDraggingPlayerModel;}
 }
