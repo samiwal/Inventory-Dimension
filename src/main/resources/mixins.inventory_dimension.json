@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_21",
   "refmap": "mixins.inventory_dimension.refmap.json",
   "mixins": [
-    "InventoryScreenMixin"
+    "BlockStateBaseMixin",
+    "InventoryScreenMixin",
+    "LevelMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -14,6 +16,7 @@
     "ClientPlayerMixin",
     "InventoryScreenMixin",
     "ItemInHandRenderMixin",
+    "LevelRendererMixin",
     "MinecraftMixin",
     "MouseHandlerMixin"
   ]

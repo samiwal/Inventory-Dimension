@@ -34,7 +34,7 @@ public class MindEntityRenderer extends HumanoidMobRenderer<MindEntity, PlayerMo
     @Override
     public void render(MindEntity entity, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource bufferSource, int packedLight) {
-        UUID uuid = entity.getPlayerUUID();
+        UUID uuid = Minecraft.getInstance().player.getUUID();
         if (uuid != null) {
             boolean slim = slimCache.getOrDefault(uuid, false);
             this.model = slim ? alexModel : steveModel;
@@ -43,14 +43,15 @@ public class MindEntityRenderer extends HumanoidMobRenderer<MindEntity, PlayerMo
     }
     @Override
     public @NotNull ResourceLocation getTextureLocation(@NotNull MindEntity entity) {
-        UUID uuid = entity.getPlayerUUID();
+        UUID uuid = Minecraft.getInstance().player.getUUID();
         if(uuid == null)return DefaultPlayerSkin.getDefaultTexture();
         return this.getOrLoadSkin(uuid);
     }
+    //gibt beim ersten aufruf immer den default zurück (asyncron laden)
     private ResourceLocation getOrLoadSkin(UUID uuid) {
-        if (skinCache.containsKey(uuid)) {
-            return skinCache.get(uuid);
-        }
+        ResourceLocation cached = skinCache.get(uuid);
+        if (cached != null) return cached;
+
         GameProfile profile = new GameProfile(uuid, "mind");
 
         CompletableFuture<PlayerSkin> future = skinManager.getOrLoad(profile);

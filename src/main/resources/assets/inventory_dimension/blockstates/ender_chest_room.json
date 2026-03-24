@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "inventory_dimension:block/ender_chest_room"
+    }
+  }
+}
