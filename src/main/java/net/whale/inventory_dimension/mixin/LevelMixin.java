@@ -12,6 +12,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Optional;
+
 @Mixin(Level.class)
 public abstract class LevelMixin {
     @Inject(method = "getBlockState", at = @At("HEAD"), cancellable = true)
@@ -21,10 +23,10 @@ public abstract class LevelMixin {
         if (mc.player == null) return;
         PlayerInterface player = (PlayerInterface) mc.player;
         if (!player.inventoryDimension$hasControlledEntity()) return;
-
+        Optional<BlockState> returnval = Optional.empty();
         MindEntity mind = player.inventoryDimension$getControlledEntity();
-        if (mind.isWallPos(pos)) {
-            cir.setReturnValue(Blocks.STONE.defaultBlockState());
-        }
+        if (mind.isSubChunkPos(pos)){ returnval = Optional.of(Blocks.AIR.defaultBlockState());}
+        if (mind.isWallPos(pos)) { returnval = Optional.of(Blocks.STONE.defaultBlockState());}
+        returnval.ifPresent(cir::setReturnValue);
     }
 }

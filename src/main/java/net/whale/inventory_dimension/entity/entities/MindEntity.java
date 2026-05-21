@@ -25,8 +25,7 @@ public class MindEntity extends Mob {
     private static final int INNER_NEAR   = 2;  // Innenraum-Start (XZ)
     private static final int INNER_NEAR_Y = 1;  // Innenraum-Start (Y)
     private static final int WALL_FAR_Y   = 9;  // Wandposition oben = Inner-Max Y
-
-
+    private boolean insideRoom = true;
 
     public MindEntity(EntityType<MindEntity> p_21368_, Level p_21369_) {
         super(p_21368_, p_21369_);
@@ -37,12 +36,10 @@ public class MindEntity extends Mob {
         int x0 = mind_position.getX(), y0 = mind_position.getY(), z0 = mind_position.getZ();
         int dx = pos.getX() - x0, dy = pos.getY() - y0, dz = pos.getZ() - z0;
 
-        // Hauptkörper: volle Außenhülle 1–14 in XZ, 0–9 in Y
+        // Hauptkörper: volle Außenhülle 1–14 in XZ, 0/9 in Y
         boolean inMainXZ = dx >= 1 && dx <= 14 && dz >= 1 && dz <= 14;
         boolean inMainY  = dy >= 0 && dy <= 9;
-        boolean isMain   = inMainXZ && inMainY && (
-                dx == 1 || dx == 14 || dz == 1 || dz == 14 || dy == 0 || dy == 9
-        );
+        boolean isMain   = inMainXZ && inMainY && (dx == 1 || dx == 14 || dz == 1 || dz == 14 || dy == 0 || dy == 9);
 
         // Deckel: 1–14 in XZ, 10–13 in Y (voller Block)
         boolean isLid = dx >= 1 && dx <= 14 && dz >= 1 && dz <= 14 && dy >= 10 && dy <= 13;
@@ -51,6 +48,11 @@ public class MindEntity extends Mob {
         boolean isLock = dx >= 7 && dx <= 8 && dy >= 7 && dy <= 10 && dz == 0;
 
         return isMain || isLid || isLock;
+    }
+    public boolean isSubChunkPos(BlockPos pos) {
+        if (mind_position == null) return false;
+        int dx = pos.getX() - mind_position.getX(), dy = pos.getY() - mind_position.getY(), dz = pos.getZ() - mind_position.getZ();
+        return dx >= 0 && dx <= 16 && dy >= 0 && dy <= 16 && dz >= 0 && dz <= 16;
     }
 
     public boolean isSpawnPos(BlockPos pos) {
@@ -76,6 +78,20 @@ public class MindEntity extends Mob {
 
         this.setDeltaMovement(Vec3.ZERO);
         handleMovementInput(mc);
+        Vec3 movement = this.getDeltaMovement();
+        if (isTryingToTeleport(movement)) {
+            if (insideRoom){
+                this.setPos(mind_position.getX() + 8, mind_position.getY() + 4, mind_position.getZ());
+                insideRoom = false;
+            }
+            else {
+                this.setPos(mind_position.getX() + 8, mind_position.getY() + 7, mind_position.getZ() + 8);
+                insideRoom = true;
+            }
+            this.setDeltaMovement(Vec3.ZERO);
+            this.playSound(net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, 1.0F, 1.0F);
+            //bugs - rendering, player schwarz in höhle(ist aber ok), tp cycle(ist auch nicht so schlimm aber kann sicher besser gelöst werden
+        }
         this.move(MoverType.SELF, this.getDeltaMovement());
 
         updateRenderBlockPos();
@@ -92,6 +108,15 @@ public class MindEntity extends Mob {
         addMovementIfKeyDown(mc.options.keyRight, -cos, 0,   -sin);
         addMovementIfKeyDown(mc.options.keyUp,    -sin, 0,    cos);
         addMovementIfKeyDown(mc.options.keyDown,  sin,  0,   -cos);
+    }
+
+    public boolean isTryingToTeleport(Vec3 movement) {
+        if (mind_position == null) return false;
+        double dx = this.getX() + movement.x - mind_position.getX();
+        double dy = this.getY() + movement.y - mind_position.getY();
+        double dz = this.getZ() + movement.z - mind_position.getZ();
+        if (insideRoom) return dx >= 7.0 && dx <= 9.0 && dz >= 7.0 && dz <= 9.0 && dy >= WALL_FAR_Y - 1;
+        else return dx >= 7.0 && dx <= 9.0 && dz >= 1.0 && dz <= 2.0 && dy >= 4 && dy <= 6;
     }
 
     private void addMovementIfKeyDown(KeyMapping key, double dx, double dy, double dz) {
@@ -117,7 +142,7 @@ public class MindEntity extends Mob {
         }
     }
 
-    private boolean isInsideRoom(BlockPos pos) {
+    public boolean isInsideRoom(BlockPos pos) {
         if (mind_position == null) return false;
         return pos.getX() >= mind_position.getX() + INNER_NEAR   && pos.getX() < mind_position.getX() + WALL_FAR
                 && pos.getY() >= mind_position.getY() + INNER_NEAR_Y  && pos.getY() < mind_position.getY() + WALL_FAR_Y

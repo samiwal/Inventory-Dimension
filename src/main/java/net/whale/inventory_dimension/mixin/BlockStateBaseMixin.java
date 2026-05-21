@@ -14,6 +14,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Optional;
+
 @Mixin(BlockBehaviour.BlockStateBase.class)
 public abstract class BlockStateBaseMixin {
     @Inject(method = "getCollisionShape*", at = @At("HEAD"), cancellable = true)
@@ -23,10 +25,13 @@ public abstract class BlockStateBaseMixin {
         if (mc.player == null) return;
         PlayerInterface player = (PlayerInterface) mc.player;
         if (!player.inventoryDimension$hasControlledEntity()) return;
-
+        Optional<VoxelShape> shape = Optional.empty();
         MindEntity mind = player.inventoryDimension$getControlledEntity();
+        if (mind.isSubChunkPos(pos))
+            shape = Optional.of(Shapes.empty());
         if (mind.isWallPos(pos)) {
-            cir.setReturnValue(Shapes.block());
+            shape = Optional.of(Shapes.block());
         }
+        shape.ifPresent(cir::setReturnValue);
     }
 }
