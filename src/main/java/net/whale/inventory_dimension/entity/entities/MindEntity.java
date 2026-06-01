@@ -25,24 +25,52 @@ public class MindEntity extends Mob {
     private static final int INNER_NEAR   = 2;  // Innenraum-Start (XZ)
     private static final int INNER_NEAR_Y = 1;  // Innenraum-Start (Y)
     private static final int WALL_FAR_Y   = 9;  // Wandposition oben = Inner-Max Y
-
-
+    private boolean insideRoom = true;
 
     public MindEntity(EntityType<MindEntity> p_21368_, Level p_21369_) {
         super(p_21368_, p_21369_);
     }
 
+    /**
+     * Determine whether the given absolute world position lies on the "solid"
+     * exterior of this mind entity's internal room structure.
+     *
+     * Behaviour and contract:
+     * - The method returns false if the mind origin (`mind_position`) is not set.
+     * - The check is performed in coordinates relative to `mind_position`.
+     *   That is, the method computes dx = pos.x - mind_position.x, dy = pos.y - mind_position.y,
+     *   dz = pos.z - mind_position.z and applies the tests below to those relative coordinates.
+     * - Returns true when the position falls on any of the following regions (all ranges inclusive):
+     *     1) Main body shell: X and Z in [1,14], Y in [0,9] and the position is on the outer
+     *        surface (dx==1 || dx==14 || dz==1 || dz==14) or on the floor/ceiling (dy==0 || dy==9).
+     *     2) Lid (a solid cap above the main body): X and Z in [1,14], Y in [10,13].
+     *     3) Lock area: X in [7,8], Y in [7,10] and Z == 0.
+     * - All ranges are inclusive and expressed relative to `mind_position` as described above.
+     * - The method is pure (no side effects) and intended for fast client‑side checks used by rendering
+     *   and hit/drawing logic. It does not validate whether the world actually contains blocks at
+     *   the tested position; it only answers whether that coordinate is considered part of the room's
+     *   exterior geometry according to the hardcoded layout.
+     *
+     * Non‑obvious details:
+     * - The method treats the room as a 16×16×16 subchunk with an inner playable area and an outer
+     *   shell. Constants such as WALL_NEAR (1), WALL_FAR (14), WALL_FAR_Y (9) and lid/lock ranges
+     *   are used by the geometric test; callers should not assume a different coordinate origin.
+     * - Because the lock uses Z == 0 it is anchored to the mind origin's Z face; callers that
+     *   transform coordinates should take that into account.
+     *
+     * @param pos absolute world position to test
+     * @return true when {@code pos} lies on the room's exterior (wall, lid or lock) relative to
+     *         the current {@code mind_position}; false otherwise or when {@code mind_position} is null
+     */
     public boolean isWallPos(BlockPos pos) {
         if (mind_position == null) return false;
         int x0 = mind_position.getX(), y0 = mind_position.getY(), z0 = mind_position.getZ();
         int dx = pos.getX() - x0, dy = pos.getY() - y0, dz = pos.getZ() - z0;
 
-        // Hauptkörper: volle Außenhülle 1–14 in XZ, 0–9 in Y
+        // Hauptkörper: volle Außenhülle 1–14 in XZ, 0/9 in Y
         boolean inMainXZ = dx >= 1 && dx <= 14 && dz >= 1 && dz <= 14;
         boolean inMainY  = dy >= 0 && dy <= 9;
-        boolean isMain   = inMainXZ && inMainY && (
-                dx == 1 || dx == 14 || dz == 1 || dz == 14 || dy == 0 || dy == 9
-        );
+        boolean isMain   = inMainXZ && inMainY && (dx == 1 || dx == 14 || dz == 1 || dz == 14 || dy == 0 || dy == 9);
 
         // Deckel: 1–14 in XZ, 10–13 in Y (voller Block)
         boolean isLid = dx >= 1 && dx <= 14 && dz >= 1 && dz <= 14 && dy >= 10 && dy <= 13;
@@ -51,6 +79,11 @@ public class MindEntity extends Mob {
         boolean isLock = dx >= 7 && dx <= 8 && dy >= 7 && dy <= 10 && dz == 0;
 
         return isMain || isLid || isLock;
+    }
+    public boolean isSubChunkPos(BlockPos pos) {
+        if (mind_position == null) return false;
+        int dx = pos.getX() - mind_position.getX(), dy = pos.getY() - mind_position.getY(), dz = pos.getZ() - mind_position.getZ();
+        return dx >= 0 && dx <= 16 && dy >= 0 && dy <= 16 && dz >= 0 && dz <= 16;
     }
 
     public boolean isSpawnPos(BlockPos pos) {
@@ -76,6 +109,20 @@ public class MindEntity extends Mob {
 
         this.setDeltaMovement(Vec3.ZERO);
         handleMovementInput(mc);
+        Vec3 movement = this.getDeltaMovement();
+        if (crossesTeleportThreshold(movement)) {
+            if (insideRoom){
+                this.setPos(mind_position.getX() + 8, mind_position.getY() + 4, mind_position.getZ());
+                insideRoom = false;
+            }
+            else {
+                this.setPos(mind_position.getX() + 8, mind_position.getY() + 7, mind_position.getZ() + 8);
+                insideRoom = true;
+            }
+            this.setDeltaMovement(Vec3.ZERO);
+            this.playSound(net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, 1.0F, 1.0F);
+            //bugs - rendering, player schwarz in höhle(ist aber ok), tp cycle(ist auch nicht so schlimm aber kann sicher besser gelöst werden
+        }
         this.move(MoverType.SELF, this.getDeltaMovement());
 
         updateRenderBlockPos();
@@ -92,6 +139,15 @@ public class MindEntity extends Mob {
         addMovementIfKeyDown(mc.options.keyRight, -cos, 0,   -sin);
         addMovementIfKeyDown(mc.options.keyUp,    -sin, 0,    cos);
         addMovementIfKeyDown(mc.options.keyDown,  sin,  0,   -cos);
+    }
+
+    public boolean crossesTeleportThreshold(Vec3 movement) {
+        if (mind_position == null) return false;
+        double dx = this.getX() + movement.x - mind_position.getX();
+        double dy = this.getY() + movement.y - mind_position.getY();
+        double dz = this.getZ() + movement.z - mind_position.getZ();
+        if (insideRoom) return dx >= 7.0 && dx <= 9.0 && dz >= 7.0 && dz <= 9.0 && dy >= WALL_FAR_Y - 1;
+        else return dx >= 7.0 && dx <= 9.0 && dz >= 1.0 && dz <= 2.0 && dy >= 4 && dy <= 6;
     }
 
     private void addMovementIfKeyDown(KeyMapping key, double dx, double dy, double dz) {
@@ -117,7 +173,7 @@ public class MindEntity extends Mob {
         }
     }
 
-    private boolean isInsideRoom(BlockPos pos) {
+    public boolean isInsideRoom(BlockPos pos) {
         if (mind_position == null) return false;
         return pos.getX() >= mind_position.getX() + INNER_NEAR   && pos.getX() < mind_position.getX() + WALL_FAR
                 && pos.getY() >= mind_position.getY() + INNER_NEAR_Y  && pos.getY() < mind_position.getY() + WALL_FAR_Y

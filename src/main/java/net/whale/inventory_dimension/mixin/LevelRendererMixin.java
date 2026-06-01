@@ -65,7 +65,7 @@ public abstract class LevelRendererMixin {
                 buffer,
                 15728880/2,
                 OverlayTexture.NO_OVERLAY,
-                ModelData.EMPTY,
+                ModelData.EMPTY, //// < Custom block models nicht unterstützt.
                 RenderType.cutout()
         );
         roomPose.popPose();
@@ -103,7 +103,7 @@ public abstract class LevelRendererMixin {
                     );
                     pose.popPose();
                     buffer.endBatch();
-                    return;
+                    return; //// < Könnte verurtsachen, dass der raum nicht gerendert wird, vllt bug.
                 }
             }
 
