@@ -31,6 +31,37 @@ public class MindEntity extends Mob {
         super(p_21368_, p_21369_);
     }
 
+    /**
+     * Determine whether the given absolute world position lies on the "solid"
+     * exterior of this mind entity's internal room structure.
+     *
+     * Behaviour and contract:
+     * - The method returns false if the mind origin (`mind_position`) is not set.
+     * - The check is performed in coordinates relative to `mind_position`.
+     *   That is, the method computes dx = pos.x - mind_position.x, dy = pos.y - mind_position.y,
+     *   dz = pos.z - mind_position.z and applies the tests below to those relative coordinates.
+     * - Returns true when the position falls on any of the following regions (all ranges inclusive):
+     *     1) Main body shell: X and Z in [1,14], Y in [0,9] and the position is on the outer
+     *        surface (dx==1 || dx==14 || dz==1 || dz==14) or on the floor/ceiling (dy==0 || dy==9).
+     *     2) Lid (a solid cap above the main body): X and Z in [1,14], Y in [10,13].
+     *     3) Lock area: X in [7,8], Y in [7,10] and Z == 0.
+     * - All ranges are inclusive and expressed relative to `mind_position` as described above.
+     * - The method is pure (no side effects) and intended for fast client‑side checks used by rendering
+     *   and hit/drawing logic. It does not validate whether the world actually contains blocks at
+     *   the tested position; it only answers whether that coordinate is considered part of the room's
+     *   exterior geometry according to the hardcoded layout.
+     *
+     * Non‑obvious details:
+     * - The method treats the room as a 16×16×16 subchunk with an inner playable area and an outer
+     *   shell. Constants such as WALL_NEAR (1), WALL_FAR (14), WALL_FAR_Y (9) and lid/lock ranges
+     *   are used by the geometric test; callers should not assume a different coordinate origin.
+     * - Because the lock uses Z == 0 it is anchored to the mind origin's Z face; callers that
+     *   transform coordinates should take that into account.
+     *
+     * @param pos absolute world position to test
+     * @return true when {@code pos} lies on the room's exterior (wall, lid or lock) relative to
+     *         the current {@code mind_position}; false otherwise or when {@code mind_position} is null
+     */
     public boolean isWallPos(BlockPos pos) {
         if (mind_position == null) return false;
         int x0 = mind_position.getX(), y0 = mind_position.getY(), z0 = mind_position.getZ();
@@ -79,7 +110,7 @@ public class MindEntity extends Mob {
         this.setDeltaMovement(Vec3.ZERO);
         handleMovementInput(mc);
         Vec3 movement = this.getDeltaMovement();
-        if (isTryingToTeleport(movement)) {
+        if (crossesTeleportThreshold(movement)) {
             if (insideRoom){
                 this.setPos(mind_position.getX() + 8, mind_position.getY() + 4, mind_position.getZ());
                 insideRoom = false;
@@ -110,7 +141,7 @@ public class MindEntity extends Mob {
         addMovementIfKeyDown(mc.options.keyDown,  sin,  0,   -cos);
     }
 
-    public boolean isTryingToTeleport(Vec3 movement) {
+    public boolean crossesTeleportThreshold(Vec3 movement) {
         if (mind_position == null) return false;
         double dx = this.getX() + movement.x - mind_position.getX();
         double dy = this.getY() + movement.y - mind_position.getY();
