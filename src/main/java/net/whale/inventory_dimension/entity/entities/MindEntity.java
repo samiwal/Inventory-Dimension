@@ -2,96 +2,96 @@ package net.whale.inventory_dimension.entity.entities;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.PlayerEnderChestContainer;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.PacketDistributor;
 import net.whale.inventory_dimension.access.PlayerInterface;
+import net.whale.inventory_dimension.level.VirtualLevelChunkSection;
+import net.whale.inventory_dimension.mixin.ChunkAccessAccessor;
+import net.whale.inventory_dimension.network.NetworkHandler;
+import net.whale.inventory_dimension.network.PlayerInventorySyncPacket;
+import net.whale.inventory_dimension.render.BlockRenderState;
+import net.whale.inventory_dimension.update.UpdateLevel;
 
 public class MindEntity extends Mob {
     public BlockPos renderBlockPos = null;
-    private int echestitemnumber;
-    private Item echestitem = Minecraft.getInstance().player.getEnderChestInventory().getItem(echestitemnumber).getItem();
-    private BlockPos mind_position;
+    private BlockPos hitBlockPos = null;
+    private int eCSlot = -1;
+    private static final int ECSLOTEMPTY = -1;
+    public final SectionPos sectionPos;
+    private final BlockPos subChunkStart;
     private static final int WALL_NEAR    = 1;  // Wandposition nah (XZ)
     private static final int WALL_FAR     = 14; // Wandposition fern (XZ) = Inner-Max XZ
     private static final int INNER_NEAR   = 2;  // Innenraum-Start (XZ)
     private static final int INNER_NEAR_Y = 1;  // Innenraum-Start (Y)
     private static final int WALL_FAR_Y   = 9;  // Wandposition oben = Inner-Max Y
-    private boolean insideRoom = true;
+    public final VirtualLevelChunkSection custumSection;
+    private final PlayerEnderChestContainer eC;
 
-    public MindEntity(EntityType<MindEntity> p_21368_, Level p_21369_) {
-        super(p_21368_, p_21369_);
+    public MindEntity(EntityType<MindEntity> entityType, Level level, SectionPos sectionPos) {
+        super(entityType, level);
+        this.sectionPos = sectionPos;
+        this.subChunkStart = sectionPos.origin();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) throw new UnsupportedOperationException("A player is needed to instance a MindEntity");
+        this.eC = mc.player.getEnderChestInventory();
+        ChunkAccess chunk = level.getChunk(sectionPos.getX(), sectionPos.getZ());
+        LevelChunkSection[] sections = ((ChunkAccessAccessor) chunk).getSections();
+        LevelChunkSection section = sections[chunk.getSectionIndexFromSectionY(sectionPos.getY())];
+        PalettedContainerRO<Holder<Biome>> biomeHolder = section.getBiomes();
+        Registry<Biome> registry = level.registryAccess().registryOrThrow(Registries.BIOME);
+        ////Warning dass blockentities dort nicht ticken können
+        LevelChunkSection virtualSection = new LevelChunkSection(((PlayerInterface) mc.player).inventoryDimension$getSectionBlockStates(),biomeHolder);
+        this.custumSection = new VirtualLevelChunkSection(registry, section, virtualSection);
+        sections[chunk.getSectionIndexFromSectionY(sectionPos.getY())] = this.custumSection;
+        UpdateLevel.updateSection(sectionPos,level,mc.levelRenderer);
+        updateActiveItem(false, true);
     }
 
-    /**
-     * Determine whether the given absolute world position lies on the "solid"
-     * exterior of this mind entity's internal room structure.
-     *
-     * Behaviour and contract:
-     * - The method returns false if the mind origin (`mind_position`) is not set.
-     * - The check is performed in coordinates relative to `mind_position`.
-     *   That is, the method computes dx = pos.x - mind_position.x, dy = pos.y - mind_position.y,
-     *   dz = pos.z - mind_position.z and applies the tests below to those relative coordinates.
-     * - Returns true when the position falls on any of the following regions (all ranges inclusive):
-     *     1) Main body shell: X and Z in [1,14], Y in [0,9] and the position is on the outer
-     *        surface (dx==1 || dx==14 || dz==1 || dz==14) or on the floor/ceiling (dy==0 || dy==9).
-     *     2) Lid (a solid cap above the main body): X and Z in [1,14], Y in [10,13].
-     *     3) Lock area: X in [7,8], Y in [7,10] and Z == 0.
-     * - All ranges are inclusive and expressed relative to `mind_position` as described above.
-     * - The method is pure (no side effects) and intended for fast client‑side checks used by rendering
-     *   and hit/drawing logic. It does not validate whether the world actually contains blocks at
-     *   the tested position; it only answers whether that coordinate is considered part of the room's
-     *   exterior geometry according to the hardcoded layout.
-     *
-     * Non‑obvious details:
-     * - The method treats the room as a 16×16×16 subchunk with an inner playable area and an outer
-     *   shell. Constants such as WALL_NEAR (1), WALL_FAR (14), WALL_FAR_Y (9) and lid/lock ranges
-     *   are used by the geometric test; callers should not assume a different coordinate origin.
-     * - Because the lock uses Z == 0 it is anchored to the mind origin's Z face; callers that
-     *   transform coordinates should take that into account.
-     *
-     * @param pos absolute world position to test
-     * @return true when {@code pos} lies on the room's exterior (wall, lid or lock) relative to
-     *         the current {@code mind_position}; false otherwise or when {@code mind_position} is null
-     */
-    public boolean isWallPos(BlockPos pos) {
-        if (mind_position == null) return false;
-        int x0 = mind_position.getX(), y0 = mind_position.getY(), z0 = mind_position.getZ();
-        int dx = pos.getX() - x0, dy = pos.getY() - y0, dz = pos.getZ() - z0;
-
-        // Hauptkörper: volle Außenhülle 1–14 in XZ, 0/9 in Y
-        boolean inMainXZ = dx >= 1 && dx <= 14 && dz >= 1 && dz <= 14;
-        boolean inMainY  = dy >= 0 && dy <= 9;
-        boolean isMain   = inMainXZ && inMainY && (dx == 1 || dx == 14 || dz == 1 || dz == 14 || dy == 0 || dy == 9);
-
-        // Deckel: 1–14 in XZ, 10–13 in Y (voller Block)
-        boolean isLid = dx >= 1 && dx <= 14 && dz >= 1 && dz <= 14 && dy >= 10 && dy <= 13;
-
-        // Schloss: X 7–8, Y 7–10, Z 0
-        boolean isLock = dx >= 7 && dx <= 8 && dy >= 7 && dy <= 10 && dz == 0;
-
-        return isMain || isLid || isLock;
-    }
-    public boolean isSubChunkPos(BlockPos pos) {
-        if (mind_position == null) return false;
-        int dx = pos.getX() - mind_position.getX(), dy = pos.getY() - mind_position.getY(), dz = pos.getZ() - mind_position.getZ();
-        return dx >= 0 && dx <= 16 && dy >= 0 && dy <= 16 && dz >= 0 && dz <= 16;
+    public MindEntity(EntityType<MindEntity> entityType, Level level){
+        super(entityType, level);
+        this.sectionPos = null;
+        this.subChunkStart = null;
+        this.custumSection = null;
+        this.eC = null;
     }
 
-    public boolean isSpawnPos(BlockPos pos) {
-        int dx = pos.getX() - mind_position.getX();
-        int dz = pos.getZ() - mind_position.getZ();
-        int dy = pos.getY() - mind_position.getY();
-        return dx >= 7 && dx <= 8 && dz >= 7 && dz <= 8
-                && dy >= WALL_FAR_Y - 2 && dy < WALL_FAR_Y;
+    private boolean isSpawnPos(BlockPos pos) {
+        int dx = pos.getX() - subChunkStart.getX();
+        int dz = pos.getZ() - subChunkStart.getZ();
+        int dy = pos.getY() - subChunkStart.getY();
+        return dx >= 7 && dx <= 8 && dz >= 2 && dz <= 3
+                && dy >= 4 && dy <= 5;
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -100,8 +100,10 @@ public class MindEntity extends Mob {
 
     @Override
     public void tick() {
+        updateActiveItem(false, true);
         super.tick();
         Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
 
         this.setXRot(mc.player.getXRot());
         this.setYRot(mc.player.getYRot());
@@ -109,20 +111,6 @@ public class MindEntity extends Mob {
 
         this.setDeltaMovement(Vec3.ZERO);
         handleMovementInput(mc);
-        Vec3 movement = this.getDeltaMovement();
-        if (crossesTeleportThreshold(movement)) {
-            if (insideRoom){
-                this.setPos(mind_position.getX() + 8, mind_position.getY() + 4, mind_position.getZ());
-                insideRoom = false;
-            }
-            else {
-                this.setPos(mind_position.getX() + 8, mind_position.getY() + 7, mind_position.getZ() + 8);
-                insideRoom = true;
-            }
-            this.setDeltaMovement(Vec3.ZERO);
-            this.playSound(net.minecraft.sounds.SoundEvents.ENDERMAN_TELEPORT, 1.0F, 1.0F);
-            //bugs - rendering, player schwarz in höhle(ist aber ok), tp cycle(ist auch nicht so schlimm aber kann sicher besser gelöst werden
-        }
         this.move(MoverType.SELF, this.getDeltaMovement());
 
         updateRenderBlockPos();
@@ -130,24 +118,15 @@ public class MindEntity extends Mob {
 
     private void handleMovementInput(Minecraft mc) {
         float yaw = getYRot();
-        double sin = Math.sin(Math.toRadians(yaw));
-        double cos = Math.cos(Math.toRadians(yaw));
-
-        addMovementIfKeyDown(mc.options.keyJump,  0,    1,    0);
-        addMovementIfKeyDown(mc.options.keyShift, 0,   -1,    0);
-        addMovementIfKeyDown(mc.options.keyLeft,  cos,  0,    sin);
-        addMovementIfKeyDown(mc.options.keyRight, -cos, 0,   -sin);
-        addMovementIfKeyDown(mc.options.keyUp,    -sin, 0,    cos);
-        addMovementIfKeyDown(mc.options.keyDown,  sin,  0,   -cos);
-    }
-
-    public boolean crossesTeleportThreshold(Vec3 movement) {
-        if (mind_position == null) return false;
-        double dx = this.getX() + movement.x - mind_position.getX();
-        double dy = this.getY() + movement.y - mind_position.getY();
-        double dz = this.getZ() + movement.z - mind_position.getZ();
-        if (insideRoom) return dx >= 7.0 && dx <= 9.0 && dz >= 7.0 && dz <= 9.0 && dy >= WALL_FAR_Y - 1;
-        else return dx >= 7.0 && dx <= 9.0 && dz >= 1.0 && dz <= 2.0 && dy >= 4 && dy <= 6;
+        float pitch = getXRot();
+        double psin = Math.sin(Math.toRadians(pitch));
+        double pcos = Math.cos(Math.toRadians(pitch));
+        double ysin = Math.sin(Math.toRadians(yaw));
+        double ycos = Math.cos(Math.toRadians(yaw));
+        addMovementIfKeyDown(mc.options.keyLeft, ycos,  0,    ysin);
+        addMovementIfKeyDown(mc.options.keyRight, -ycos, 0,   -ysin);
+        addMovementIfKeyDown(mc.options.keyUp,    -ysin * pcos, - psin, ycos * pcos);
+        addMovementIfKeyDown(mc.options.keyDown,  ysin * pcos,  psin,   -ycos * pcos);
     }
 
     private void addMovementIfKeyDown(KeyMapping key, double dx, double dy, double dz) {
@@ -157,27 +136,34 @@ public class MindEntity extends Mob {
     private void updateRenderBlockPos() {
         Vec3 start = this.getEyePosition(1.0F);
         Vec3 end = start.add(this.getViewVector(1.0F).scale(5));
-
+        BlockPos hitPos = null;
+        BlockPos renderPos;
         BlockHitResult hitResult = level().clip(
                 new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, this)
         );
 
         if (hitResult.getType() == HitResult.Type.MISS) {
-            renderBlockPos = BlockPos.containing(end);
+            renderPos = BlockPos.containing(end);
         } else {
-            renderBlockPos = hitResult.getBlockPos().relative(hitResult.getDirection());
+            hitPos = hitResult.getBlockPos();
+            renderPos = hitPos.relative(hitResult.getDirection());
         }
-
-        if (!isInsideRoom(renderBlockPos) || !level().getBlockState(renderBlockPos).isAir() || isSpawnPos(renderBlockPos)) {
-            renderBlockPos = null;
+        renderBlockPos = validatePos(renderPos,true);
+        hitBlockPos = validatePos(hitPos,false);
+    }
+    BlockPos validatePos(BlockPos pos,boolean shouldBeAir){
+        if (!isInsideRoom(pos) || (level().getBlockState(pos).isAir() != shouldBeAir) || isSpawnPos(pos)) {
+            pos = null;
         }
+        return pos;
     }
 
     public boolean isInsideRoom(BlockPos pos) {
-        if (mind_position == null) return false;
-        return pos.getX() >= mind_position.getX() + INNER_NEAR   && pos.getX() < mind_position.getX() + WALL_FAR
-                && pos.getY() >= mind_position.getY() + INNER_NEAR_Y  && pos.getY() < mind_position.getY() + WALL_FAR_Y
-                && pos.getZ() >= mind_position.getZ() + INNER_NEAR   && pos.getZ() < mind_position.getZ() + WALL_FAR;
+        if (subChunkStart == null) return false;
+        if (pos == null) return false;
+        return pos.getX() >= subChunkStart.getX() + INNER_NEAR   && pos.getX() < subChunkStart.getX() + WALL_FAR
+                && pos.getY() >= subChunkStart.getY() + INNER_NEAR_Y  && pos.getY() < subChunkStart.getY() + WALL_FAR_Y
+                && pos.getZ() >= subChunkStart.getZ() + INNER_NEAR   && pos.getZ() < subChunkStart.getZ() + WALL_FAR;
     }
 
     @Override
@@ -185,35 +171,118 @@ public class MindEntity extends Mob {
         return false;
     }
 
-    public void deleteBlockIfPossible() {
-        //TODO
-    }
-    public void placeBlockIfPossible() {
-        //TODO
-    }
-    public void selectBlockIfPossible() {
-        //TODO
+    public void destroy() {
+        if (hitBlockPos == null) return;
+        if (Screen.hasShiftDown()) {
+
+        }
+        ItemStack stack = getItemStackFormBlockPos(hitBlockPos);
+        if (Screen.hasAltDown()){
+            NetworkHandler.INSTANCE.send(new PlayerInventorySyncPacket(stack), PacketDistributor.SERVER.noArg());
+        } else {
+            if (!eC.canAddItem(stack)) return;
+            eC.addItem(stack);
+        }
+        level().getChunkAt(hitBlockPos).removeBlockEntity(hitBlockPos);
+        level().setBlock(hitBlockPos, Blocks.AIR.defaultBlockState(), 2);
     }
 
-    public void onScroll(boolean next) {
+    private ItemStack getItemStackFormBlockPos(BlockPos pos){
+        Item item = custumSection.getVirtualSection().getBlockState(
+                pos.getX() & 15,
+                pos.getY() & 15,
+                pos.getZ() & 15).getBlock().asItem();
+        ItemStack stack = new ItemStack(item);
+        BlockEntity blockEntity = level().getBlockEntity(pos);
+        if (blockEntity != null) {
+            blockEntity.saveToItem(stack, level().registryAccess());
+        }
+        return stack;
+    }
+
+    public void interact() {
+        if (Screen.hasShiftDown() || hitBlockPos == null) {
+            place();
+        } else {
+            BlockState state = level().getBlockState(hitBlockPos);
+            if (state.getBlock() instanceof EntityBlock) {
+                BlockEntity blockEntity = level().getBlockEntity(hitBlockPos);
+                if (blockEntity instanceof MenuProvider) {
+
+                }
+            }
+
+        }
+
+    }
+    private void place() {
+        if (renderBlockPos == null) return;
+        if (eCSlot <= ECSLOTEMPTY) return;
         Minecraft mc = Minecraft.getInstance();
-        int total = ((PlayerInterface) mc.player).inventoryDimension$getEntityItems() + 1;
-        echestitemnumber = next
-                ? (echestitemnumber + 1) % total
-                : (echestitemnumber - 1 + total) % total;
-        this.echestitem = mc.player.getEnderChestInventory().getItem(echestitemnumber).getItem();
-        this.playSound(net.minecraft.sounds.SoundEvents.UI_STONECUTTER_SELECT_RECIPE, 0.5F, 1.0F);
+        ItemStack stack = eC.getItem(eCSlot);
+        if (!stack.getItem().equals(Items.AIR)) {
+            BlockState stateToPlace = BlockRenderState.state;
+            if (stateToPlace.getBlock() != ((BlockItem) stack.getItem()).getBlock()) {
+                return;
+            }
+            try {
+                ((PlayerInterface) mc.player).inventoryDimension$setEditingVirtual(true);
+                level().setBlock(renderBlockPos,stateToPlace,2);
+            } finally {
+                ((PlayerInterface) mc.player).inventoryDimension$setEditingVirtual(false);
+            }
+            BlockEntity be = level().getBlockEntity(renderBlockPos);
+            if (be != null) {
+                CustomData data = stack.get(DataComponents.BLOCK_ENTITY_DATA);
+                if (data != null) { data.loadInto(be,level().registryAccess()); }
+                be.setChanged();
+            }
+            stack.shrink(1);
+            updateActiveItem(false,true);
+        }
+    }
+
+    public void select() {
+        ItemStack stack = getItemStackFormBlockPos(hitBlockPos);
+        if (Screen.hasAltDown()){
+             Minecraft mc = Minecraft.getInstance();
+             if (mc.player == null) return;
+             Inventory inventory = mc.player.getInventory();
+             inventory.setPickedItem(stack);
+        } else {
+            for (int i = 0; i < eC.getContainerSize(); i++) {
+                ItemStack itemstack = eC.getItem(i);
+                if (ItemStack.isSameItem(itemstack, stack)) {
+                    eCSlot = i;
+                }
+            }
+        }
+    }
+
+    public void updateActiveItem(boolean scroll, boolean direction) {
+        Minecraft mc = Minecraft.getInstance();
+        int eCLastSlot = eC.getContainerSize() - 1;
+        if (mc.player == null) return;
+        int slotFindHelper = eCSlot;
+        if(!scroll){ if (eCSlot == ECSLOTEMPTY) return; }
+        else slotFindHelper += direction ? 1 : -1;
+        if(slotFindHelper < ECSLOTEMPTY) slotFindHelper = eCLastSlot;
+        if(slotFindHelper > eCLastSlot) slotFindHelper = ECSLOTEMPTY;
+        for (; slotFindHelper <= eCLastSlot && slotFindHelper > ECSLOTEMPTY; slotFindHelper += direction ? 1 : -1) {
+            if (eC.getItem(slotFindHelper).getItem() instanceof BlockItem) {
+                eCSlot = slotFindHelper;
+                return;
+            }
+        }
+        eCSlot = ECSLOTEMPTY;
     }
 
     public Item getEchestitem() {
-        return echestitem;
+        if (eCSlot < 0 || eCSlot > eC.getContainerSize()) return Items.AIR;
+        return eC.getItem(eCSlot).getItem();
     }
 
-    public BlockPos getMindPosition() {
-        return mind_position;
-    }
-
-    public void setMindPosition(BlockPos mind_position) {
-        this.mind_position = mind_position;
+    public BlockPos getMindChunkPosition() {
+        return subChunkStart;
     }
 }

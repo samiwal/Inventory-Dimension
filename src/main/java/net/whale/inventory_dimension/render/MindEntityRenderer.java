@@ -1,4 +1,4 @@
-package net.whale.inventory_dimension.entity.util;
+package net.whale.inventory_dimension.render;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.vertex.PoseStack;

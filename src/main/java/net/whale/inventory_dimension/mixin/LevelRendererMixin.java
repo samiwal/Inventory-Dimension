@@ -19,6 +19,7 @@ import net.whale.inventory_dimension.entity.entities.MindEntity;
 import net.whale.inventory_dimension.render.BlockRenderState;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -47,7 +48,7 @@ public abstract class LevelRendererMixin {
         MindEntity entity = player.inventoryDimension$getControlledEntity();
 
         MultiBufferSource.BufferSource buffer = mc.renderBuffers().bufferSource();
-        BlockPos startPos = entity.getMindPosition();
+        BlockPos startPos = entity.getMindChunkPosition();
 
         PoseStack roomPose = new PoseStack();
         roomPose.last().pose().mul(p_254120_);
@@ -74,7 +75,9 @@ public abstract class LevelRendererMixin {
         if (entity.getEchestitem() instanceof BlockItem blockItem) {
 
             BlockPos pos = entity.renderBlockPos;
-            if (pos == null) {return;} ;
+            if (pos == null) {
+                return;
+            }
 
             if (BlockRenderState.state.getBlock().asItem() != blockItem) {
                 BlockRenderState.state = blockItem.getBlock().defaultBlockState();
@@ -93,6 +96,13 @@ public abstract class LevelRendererMixin {
 
             buffer = mc.renderBuffers().bufferSource();
 
+            if (BlockRenderState.state.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL) {
+                mc.getBlockRenderer().renderSingleBlock(
+                        BlockRenderState.state, pose, buffer,
+                        15728880, OverlayTexture.NO_OVERLAY, ModelData.EMPTY, RenderType.translucent()
+                );
+            }
+
             Block block = blockItem.getBlock();
             if (block instanceof EntityBlock entityBlock) {
                 BlockEntity be = entityBlock.newBlockEntity(pos, BlockRenderState.state);
@@ -101,18 +111,16 @@ public abstract class LevelRendererMixin {
                     mc.getBlockEntityRenderDispatcher().render(
                             be, p_342180_.getGameTimeDeltaPartialTick(true), pose, buffer
                     );
-                    pose.popPose();
-                    buffer.endBatch();
-                    return; //// < Könnte verurtsachen, dass der raum nicht gerendert wird, vllt bug.
                 }
             }
-
-            mc.getBlockRenderer().renderSingleBlock(
-                    BlockRenderState.state, pose, buffer,
-                    15728880, OverlayTexture.NO_OVERLAY, ModelData.EMPTY, RenderType.translucent()
-            );
             pose.popPose();
             buffer.endBatch();
         }
+    }
+
+    @Mixin(LevelRenderer.class)
+    public interface LevelRendererAccessor {
+        @Invoker("setSectionDirty")
+        void invokeSetSectionDirty(int sectionX, int sectionY, int sectionZ, boolean important);
     }
 }

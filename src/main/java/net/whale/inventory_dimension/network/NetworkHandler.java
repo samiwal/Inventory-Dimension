@@ -21,5 +21,20 @@ public class NetworkHandler {
                 .decoder(EnderChestSyncPacket::new)
                 .consumerMainThread(EnderChestSyncPacket::handle)
                 .add();
+        INSTANCE.messageBuilder(InventoryDimensionSyncPacket.class)
+                .encoder(InventoryDimensionSyncPacket::encode)
+                .decoder(InventoryDimensionSyncPacket::new)
+                .consumerMainThread(InventoryDimensionSyncPacket::handle)
+                .add();
+        INSTANCE.messageBuilder(PlayerInventoryRemovePacket.class)
+                .encoder(PlayerInventoryRemovePacket::encode)
+                .decoder(PlayerInventoryRemovePacket::new)
+                .consumerMainThread(PlayerInventoryRemovePacket::handle)
+                .add();
+        INSTANCE.messageBuilder(PlayerInventorySyncPacket.class)
+                .encoder(PlayerInventorySyncPacket::encode)
+                .decoder(PlayerInventorySyncPacket::new)
+                .consumerMainThread(PlayerInventorySyncPacket::handle)
+                .add();
     }
 }
