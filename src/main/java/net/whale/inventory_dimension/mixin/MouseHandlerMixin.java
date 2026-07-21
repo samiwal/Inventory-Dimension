@@ -20,9 +20,9 @@ public abstract class MouseHandlerMixin {
             MindEntity entity = ((PlayerInterface) mc.player).inventoryDimension$getControlledEntity();
 
             if (yOffset > 0) {
-                entity.onScroll(false);
+                entity.updateActiveItem(true,false);
             } else if (yOffset < 0) {
-                entity.onScroll(true);
+                entity.updateActiveItem(true, true);
             }
             ci.cancel();
         }

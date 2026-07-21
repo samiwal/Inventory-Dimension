@@ -1,15 +1,20 @@
 package net.whale.inventory_dimension.access;
 
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.PalettedContainer;
 import net.whale.inventory_dimension.entity.entities.MindEntity;
 
 public interface PlayerInterface {
+    void inventoryDimension$setSectionBlockStates(PalettedContainer<BlockState> states);
+    PalettedContainer<BlockState> inventoryDimension$getSectionBlockStates();
+
+    void inventoryDimension$setEditingVirtual(boolean editingVirtual);
+    boolean inventoryDimension$getEditingVirtual();
+
     void inventoryDimension$setControlledEntity(MindEntity entity);
     MindEntity inventoryDimension$getControlledEntity();
     boolean inventoryDimension$hasControlledEntity();
-
-    void inventoryDimension$setEntityItems(int items);
-    int inventoryDimension$getEntityItems();
 
     void inventoryDimension$setIsOnItemSlot(boolean isOnItemSlot);
     boolean inventoryDimension$getIsOnItemSlot();
