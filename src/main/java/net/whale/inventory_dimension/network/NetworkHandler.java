@@ -26,11 +26,6 @@ public class NetworkHandler {
                 .decoder(InventoryDimensionSyncPacket::new)
                 .consumerMainThread(InventoryDimensionSyncPacket::handle)
                 .add();
-        INSTANCE.messageBuilder(PlayerInventoryRemovePacket.class)
-                .encoder(PlayerInventoryRemovePacket::encode)
-                .decoder(PlayerInventoryRemovePacket::new)
-                .consumerMainThread(PlayerInventoryRemovePacket::handle)
-                .add();
         INSTANCE.messageBuilder(PlayerInventorySyncPacket.class)
                 .encoder(PlayerInventorySyncPacket::encode)
                 .decoder(PlayerInventorySyncPacket::new)

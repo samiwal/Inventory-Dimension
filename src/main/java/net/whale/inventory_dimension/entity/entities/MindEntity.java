@@ -36,6 +36,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.PacketDistributor;
 import net.whale.inventory_dimension.access.PlayerInterface;
+import net.whale.inventory_dimension.level.VirtualLevel;
 import net.whale.inventory_dimension.level.VirtualLevelChunkSection;
 import net.whale.inventory_dimension.mixin.ChunkAccessAccessor;
 import net.whale.inventory_dimension.network.NetworkHandler;
@@ -56,6 +57,7 @@ public class MindEntity extends Mob {
     private static final int INNER_NEAR_Y = 1;  // Innenraum-Start (Y)
     private static final int WALL_FAR_Y   = 9;  // Wandposition oben = Inner-Max Y
     public final VirtualLevelChunkSection custumSection;
+    public final VirtualLevel virtualLevel;
     private final PlayerEnderChestContainer eC;
 
     public MindEntity(EntityType<MindEntity> entityType, Level level, SectionPos sectionPos) {
@@ -73,6 +75,7 @@ public class MindEntity extends Mob {
         ////Warning dass blockentities dort nicht ticken können
         LevelChunkSection virtualSection = new LevelChunkSection(((PlayerInterface) mc.player).inventoryDimension$getSectionBlockStates(),biomeHolder);
         this.custumSection = new VirtualLevelChunkSection(registry, section, virtualSection);
+        this.virtualLevel = new VirtualLevel(level, this.custumSection, sectionPos);
         sections[chunk.getSectionIndexFromSectionY(sectionPos.getY())] = this.custumSection;
         UpdateLevel.updateSection(sectionPos,level,mc.levelRenderer);
         updateActiveItem(false, true);
@@ -83,6 +86,7 @@ public class MindEntity extends Mob {
         this.sectionPos = null;
         this.subChunkStart = null;
         this.custumSection = null;
+        this.virtualLevel = null;
         this.eC = null;
     }
 
