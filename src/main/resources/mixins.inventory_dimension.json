@@ -18,6 +18,7 @@
     "LevelRendererMixin",
     "LevelRendererMixin$LevelRendererAccessor",
     "MinecraftMixin",
-    "MouseHandlerMixin"
+    "MouseHandlerMixin",
+    "MultiPlayerGameModeMixin"
   ]
 }

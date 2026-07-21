@@ -2,19 +2,21 @@ package net.whale.inventory_dimension.entity.entities;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
-import net.minecraft.core.SectionPos;
+import net.minecraft.core.*;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.PlayerEnderChestContainer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -34,19 +36,20 @@ import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.PacketDistributor;
 import net.whale.inventory_dimension.access.PlayerInterface;
 import net.whale.inventory_dimension.level.VirtualLevel;
 import net.whale.inventory_dimension.level.VirtualLevelChunkSection;
 import net.whale.inventory_dimension.mixin.ChunkAccessAccessor;
-import net.whale.inventory_dimension.network.NetworkHandler;
-import net.whale.inventory_dimension.network.PlayerInventorySyncPacket;
 import net.whale.inventory_dimension.render.BlockRenderState;
 import net.whale.inventory_dimension.update.UpdateLevel;
+
+import java.util.Optional;
 
 public class MindEntity extends Mob {
     public BlockPos renderBlockPos = null;
     private BlockPos hitBlockPos = null;
+    private Direction hitDirection = null;
+    public AbstractContainerMenu menu = null;
     private int eCSlot = -1;
     private static final int ECSLOTEMPTY = -1;
     public final SectionPos sectionPos;
@@ -154,6 +157,7 @@ public class MindEntity extends Mob {
         }
         renderBlockPos = validatePos(renderPos,true);
         hitBlockPos = validatePos(hitPos,false);
+        hitDirection = hitResult.getDirection();
     }
     BlockPos validatePos(BlockPos pos,boolean shouldBeAir){
         if (!isInsideRoom(pos) || (level().getBlockState(pos).isAir() != shouldBeAir) || isSpawnPos(pos)) {
@@ -182,7 +186,7 @@ public class MindEntity extends Mob {
         }
         ItemStack stack = getItemStackFormBlockPos(hitBlockPos);
         if (Screen.hasAltDown()){
-            NetworkHandler.INSTANCE.send(new PlayerInventorySyncPacket(stack), PacketDistributor.SERVER.noArg());
+            //NetworkHandler.INSTANCE.send(new PlayerInventorySyncPacket(stack), PacketDistributor.SERVER.noArg());
         } else {
             if (!eC.canAddItem(stack)) return;
             eC.addItem(stack);
@@ -211,14 +215,30 @@ public class MindEntity extends Mob {
             BlockState state = level().getBlockState(hitBlockPos);
             if (state.getBlock() instanceof EntityBlock) {
                 BlockEntity blockEntity = level().getBlockEntity(hitBlockPos);
-                if (blockEntity instanceof MenuProvider) {
-
+                Player player = Minecraft.getInstance().player;
+                if(player == null) return;
+                if (blockEntity instanceof MenuProvider provider) {
+                    menu = provider.createMenu(-2,player.getInventory(), player);
+                    openScreen(menu.getType(), menu, Minecraft.getInstance(), -2, provider.getDisplayName());
                 }
             }
 
         }
 
     }
+
+    private static <T extends AbstractContainerMenu> void openScreen(
+            MenuType<T> menuType, AbstractContainerMenu menu, Minecraft mc, int containerId, Component title) {
+        Optional<MenuScreens.ScreenConstructor<T, ?>> factory =
+                MenuScreens.getScreenFactory(menuType, mc, containerId, title);
+        if (factory.isPresent()) {
+            @SuppressWarnings("unchecked")
+            T typedMenu = (T) menu;
+            Screen screen = factory.get().create(typedMenu, mc.player.getInventory(), title);
+            mc.setScreen(screen);
+        }
+    }
+
     private void place() {
         if (renderBlockPos == null) return;
         if (eCSlot <= ECSLOTEMPTY) return;

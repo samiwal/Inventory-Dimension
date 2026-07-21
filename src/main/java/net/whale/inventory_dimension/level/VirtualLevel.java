@@ -24,6 +24,7 @@ import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.world.level.storage.WritableLevelData;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.ticks.LevelTickAccess;
@@ -42,9 +43,9 @@ public class VirtualLevel extends Level {
 
 
     public VirtualLevel(Level level, VirtualLevelChunkSection section, SectionPos startPos) {
-        super(level.getChunkSource(), level.getEntityManager(), level.getLevelData(),
-                level.dimensionType(), level.dimension(), level.getProfilerSupplier(),
-                level.isClientSide, level.isDebug(), level.isFlat(), level.getSeed());
+        super((WritableLevelData) level.getLevelData(), level.dimension(), level.registryAccess(),
+                level.dimensionTypeRegistration(), level.getProfilerSupplier(),
+                level.isClientSide(), level.isDebug(), 0L, 0);
         this.realLevel = level;
         this.section = section;
         this.startPos = startPos;
