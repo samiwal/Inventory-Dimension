@@ -1,5 +1,6 @@
 package net.whale.inventory_dimension.level;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -76,6 +77,7 @@ public class VirtualLevel extends Level {
 
     @Override
     public boolean setBlock(BlockPos blockPos, BlockState state, int flags) {
+        if (Minecraft.getInstance().player == null) return false;
         if (SectionPos.of(blockPos).equals(startPos)) {
             section.setBlockState(blockPos.getX() & 15, blockPos.getY() & 15, blockPos.getZ() & 15, state, false);
             if (state.hasBlockEntity()) {
