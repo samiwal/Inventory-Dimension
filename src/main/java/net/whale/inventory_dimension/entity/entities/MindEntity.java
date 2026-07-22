@@ -191,8 +191,13 @@ public class MindEntity extends Mob {
             if (!eC.canAddItem(stack)) return;
             eC.addItem(stack);
         }
-        level().getChunkAt(hitBlockPos).removeBlockEntity(hitBlockPos);
-        level().setBlock(hitBlockPos, Blocks.AIR.defaultBlockState(), 2);
+        try {
+            ((PlayerInterface) Minecraft.getInstance().player).inventoryDimension$setEditingVirtual(true);
+            level().getChunkAt(hitBlockPos).removeBlockEntity(hitBlockPos);
+            level().setBlock(hitBlockPos, Blocks.AIR.defaultBlockState(), 2);
+        } finally {
+            ((PlayerInterface) Minecraft.getInstance().player).inventoryDimension$setEditingVirtual(false);
+        }
     }
 
     private ItemStack getItemStackFormBlockPos(BlockPos pos){
@@ -255,11 +260,15 @@ public class MindEntity extends Mob {
             } finally {
                 ((PlayerInterface) mc.player).inventoryDimension$setEditingVirtual(false);
             }
-            BlockEntity be = level().getBlockEntity(renderBlockPos);
-            if (be != null) {
-                CustomData data = stack.get(DataComponents.BLOCK_ENTITY_DATA);
-                if (data != null) { data.loadInto(be,level().registryAccess()); }
-                be.setChanged();
+            if (stateToPlace.hasBlockEntity()) {
+                BlockEntity be = ((EntityBlock) stateToPlace.getBlock()).newBlockEntity(renderBlockPos, stateToPlace);
+                virtualLevel.setBlockEntity(be);
+                BlockEntity beInLevel = virtualLevel.getBlockEntity(renderBlockPos);
+                if (beInLevel != null) {
+                    CustomData data = stack.get(DataComponents.BLOCK_ENTITY_DATA);
+                    if (data != null) { data.loadInto(beInLevel,virtualLevel.registryAccess()); }
+                    beInLevel.setChanged();
+                }
             }
             stack.shrink(1);
             updateActiveItem(false,true);
